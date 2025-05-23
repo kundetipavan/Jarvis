@@ -229,7 +229,7 @@
         <div class="status-text" id="statusText">Tap to speak</div>
 
         <div class="transcript" id="transcript">
-            <div class="ai-response">Hello! I'm Jarvis, your AI assistant. Tap the button and start speaking to get started.</div>
+            <div class="ai-response">🎤 Hello! I'm Jarvis, your voice assistant. Tap the button and ask me anything - I'll respond with voice!</div>
         </div>
 
         <div class="controls">
@@ -459,19 +459,26 @@
                 // Generate AI response
                 const aiResponse = this.generateAIResponse(userText);
                 
-                // Add AI response to transcript
-                const aiDiv = document.createElement('div');
-                aiDiv.className = 'ai-response';
-                aiDiv.textContent = `Jarvis: ${aiResponse}`;
-                this.transcript.appendChild(aiDiv);
+                // Show brief status instead of full response
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'ai-response';
+                statusDiv.innerHTML = '<em>🎤 Jarvis is responding...</em>';
+                this.transcript.appendChild(statusDiv);
 
                 // Scroll to bottom
                 this.transcript.scrollTop = this.transcript.scrollHeight;
 
-                // Speak the response
+                // Speak the response (main feature)
                 if (!this.isMuted) {
-                    this.speakText(aiResponse);
+                    await this.speakText(aiResponse);
                 }
+
+                // Remove the status message after speaking
+                setTimeout(() => {
+                    if (statusDiv.parentNode) {
+                        statusDiv.remove();
+                    }
+                }, 1000);
 
                 this.isProcessing = false;
                 this.resetUI();
@@ -687,28 +694,44 @@
                 return responses[Math.floor(Math.random() * responses.length)];
             }
 
-            speakText(text) {
+            async speakText(text) {
                 if (this.synthesis && !this.isMuted) {
                     // Cancel any ongoing speech
                     this.synthesis.cancel();
                     
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.rate = 0.9;
-                    utterance.pitch = 1;
-                    utterance.volume = 0.8;
-                    
-                    // Try to use a more natural voice
-                    const voices = this.synthesis.getVoices();
-                    const preferredVoice = voices.find(voice => 
-                        voice.name.includes('Google') || 
-                        voice.name.includes('Microsoft') ||
-                        voice.lang === 'en-US'
-                    );
-                    if (preferredVoice) {
-                        utterance.voice = preferredVoice;
-                    }
-                    
-                    this.synthesis.speak(utterance);
+                    return new Promise((resolve) => {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.rate = 0.9;
+                        utterance.pitch = 1;
+                        utterance.volume = 0.8;
+                        
+                        // Try to use a more natural voice
+                        const voices = this.synthesis.getVoices();
+                        const preferredVoice = voices.find(voice => 
+                            voice.name.includes('Google') || 
+                            voice.name.includes('Microsoft') ||
+                            voice.name.includes('Samantha') ||
+                            voice.name.includes('Alex') ||
+                            (voice.lang === 'en-US' && voice.localService)
+                        );
+                        if (preferredVoice) {
+                            utterance.voice = preferredVoice;
+                        }
+                        
+                        utterance.onend = () => {
+                            resolve();
+                        };
+                        
+                        utterance.onerror = () => {
+                            resolve();
+                        };
+                        
+                        // Update status while speaking
+                        this.statusText.textContent = '🔊 Jarvis is speaking...';
+                        this.statusText.classList.add('active');
+                        
+                        this.synthesis.speak(utterance);
+                    });
                 }
             }
 
@@ -726,7 +749,7 @@
             }
 
             clearTranscript() {
-                this.transcript.innerHTML = '<div class="ai-response">Transcript cleared. How can I help you?</div>';
+                this.transcript.innerHTML = '<div class="ai-response">🎤 Transcript cleared. Ask me anything and I\'ll respond with voice!</div>';
             }
 
             toggleMute() {
