@@ -183,6 +183,29 @@
             margin-top: 1rem;
             font-size: 0.9rem;
         }
+
+        .permission-helper {
+            background: rgba(255, 170, 0, 0.1);
+            border: 1px solid rgba(255, 170, 0, 0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #ffaa00;
+        }
+
+        .permission-helper p {
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .permission-helper ol {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .permission-helper li {
+            margin: 0.3rem 0;
+        }
     </style>
 </head>
 <body>
@@ -239,38 +262,55 @@
             }
 
             initSpeechRecognition() {
-                if ('webkitSpeechRecognition' in window) {
-                    this.recognition = new webkitSpeechRecognition();
-                } else if ('SpeechRecognition' in window) {
-                    this.recognition = new SpeechRecognition();
-                } else {
-                    this.showError('Speech recognition not supported in this browser');
+                // Check for speech recognition support
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                
+                if (!SpeechRecognition) {
+                    this.showError('Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari.');
+                    this.voiceBtn.disabled = true;
                     return;
                 }
 
+                this.recognition = new SpeechRecognition();
                 this.recognition.continuous = false;
                 this.recognition.interimResults = true;
                 this.recognition.lang = 'en-US';
+                this.recognition.maxAlternatives = 1;
 
                 this.recognition.onstart = () => {
                     this.isListening = true;
                     this.updateUI('listening', 'Listening...');
                     this.waveAnimation.classList.add('active');
+                    this.clearError();
                 };
 
                 this.recognition.onresult = (event) => {
                     let transcript = '';
+                    let interimTranscript = '';
+                    
                     for (let i = event.resultIndex; i < event.results.length; i++) {
-                        transcript += event.results[i][0].transcript;
+                        const result = event.results[i];
+                        if (result.isFinal) {
+                            transcript += result[0].transcript;
+                        } else {
+                            interimTranscript += result[0].transcript;
+                        }
                     }
                     
-                    if (event.results[event.results.length - 1].isFinal) {
-                        this.processUserInput(transcript);
+                    // Show interim results
+                    if (interimTranscript) {
+                        this.statusText.textContent = `Hearing: "${interimTranscript}"`;
+                    }
+                    
+                    // Process final result
+                    if (transcript.trim()) {
+                        this.processUserInput(transcript.trim());
                     }
                 };
 
                 this.recognition.onerror = (event) => {
-                    this.showError(`Speech recognition error: ${event.error}`);
+                    console.error('Speech recognition error:', event.error);
+                    this.handleSpeechError(event.error);
                     this.resetUI();
                 };
 
@@ -283,12 +323,69 @@
                 };
             }
 
+            handleSpeechError(error) {
+                let errorMessage = '';
+                let showPermissionButton = false;
+
+                switch (error) {
+                    case 'not-allowed':
+                        errorMessage = 'Microphone access denied. Please allow microphone permissions.';
+                        showPermissionButton = true;
+                        break;
+                    case 'no-speech':
+                        errorMessage = "No speech detected. Please try speaking again.";
+                        break;
+                    case 'audio-capture':
+                        errorMessage = 'No microphone found. Please check your microphone connection.';
+                        break;
+                    case 'network':
+                        errorMessage = 'Network error occurred. Please check your internet connection.';
+                        break;
+                    case 'service-not-allowed':
+                        errorMessage = 'Speech recognition service not allowed. Please enable it in browser settings.';
+                        break;
+                    case 'bad-grammar':
+                        errorMessage = 'Speech recognition grammar error. Please try again.';
+                        break;
+                    case 'language-not-supported':
+                        errorMessage = 'Language not supported. Please check your browser language settings.';
+                        break;
+                    default:
+                        errorMessage = `Speech recognition error: ${error}. Please try again.`;
+                }
+
+                this.showError(errorMessage);
+                
+                if (showPermissionButton) {
+                    this.showPermissionHelper();
+                }
+            }
+
+            showPermissionHelper() {
+                // Create permission helper
+                const permissionDiv = document.createElement('div');
+                permissionDiv.className = 'permission-helper';
+                permissionDiv.innerHTML = `
+                    <p>To use voice features:</p>
+                    <ol>
+                        <li>Click the microphone icon in your browser's address bar</li>
+                        <li>Select "Always allow" for microphone access</li>
+                        <li>Refresh the page and try again</li>
+                    </ol>
+                    <button class="control-btn" onclick="this.parentElement.remove(); window.location.reload();">
+                        Refresh Page
+                    </button>
+                `;
+                
+                this.transcript.appendChild(permissionDiv);
+            }
+
             bindEvents() {
-                this.voiceBtn.addEventListener('click', () => {
+                this.voiceBtn.addEventListener('click', async () => {
                     if (this.isListening) {
                         this.stopListening();
                     } else {
-                        this.startListening();
+                        await this.startListening();
                     }
                 });
 
@@ -301,14 +398,45 @@
                 });
             }
 
-            startListening() {
-                if (!this.recognition) return;
+            async startListening() {
+                if (!this.recognition) {
+                    this.showError('Speech recognition not available');
+                    return;
+                }
+                
+                // Request microphone permission first
+                try {
+                    await this.requestMicrophonePermission();
+                } catch (error) {
+                    this.showError('Microphone permission required. Please allow microphone access and try again.');
+                    this.showPermissionHelper();
+                    return;
+                }
                 
                 this.clearError();
+                
                 try {
+                    // Stop any existing recognition
+                    if (this.isListening) {
+                        this.recognition.stop();
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
                     this.recognition.start();
                 } catch (error) {
-                    this.showError('Failed to start speech recognition');
+                    console.error('Failed to start recognition:', error);
+                    this.showError('Failed to start speech recognition. Please try again.');
+                }
+            }
+
+            async requestMicrophonePermission() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    // Stop the stream immediately as we just needed permission
+                    stream.getTracks().forEach(track => track.stop());
+                    return true;
+                } catch (error) {
+                    throw new Error('Microphone permission denied');
                 }
             }
 
