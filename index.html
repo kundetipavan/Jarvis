@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis AI Voice Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            position: relative;
+        }
+
+        .jarvis-logo {
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 2rem;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+
+        .voice-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            border: none;
+            cursor: pointer;
+            position: relative;
+            margin: 2rem auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .voice-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(0, 212, 255, 0.4);
+        }
+
+        .voice-button.listening {
+            animation: pulse 1.5s infinite;
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            box-shadow: 0 10px 30px rgba(255, 68, 68, 0.4);
+        }
+
+        .voice-button.processing {
+            animation: spin 2s linear infinite;
+            background: linear-gradient(45deg, #ffaa00, #cc8800);
+            box-shadow: 0 10px 30px rgba(255, 170, 0, 0.4);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .mic-icon {
+            width: 40px;
+            height: 40px;
+            fill: white;
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            margin: 1rem 0;
+            min-height: 1.5rem;
+            color: #aaa;
+        }
+
+        .status-text.active {
+            color: #00d4ff;
+            font-weight: 500;
+        }
+
+        .transcript {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            min-height: 100px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .user-message {
+            color: #00d4ff;
+            margin-bottom: 1rem;
+            font-style: italic;
+        }
+
+        .ai-response {
+            color: #fff;
+            line-height: 1.5;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .wave-animation {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 3px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .wave-animation.active {
+            opacity: 1;
+        }
+
+        .wave-bar {
+            width: 4px;
+            height: 20px;
+            background: #00d4ff;
+            border-radius: 2px;
+            animation: wave 1s infinite;
+        }
+
+        .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+        .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+
+        @keyframes wave {
+            0%, 100% { height: 20px; }
+            50% { height: 40px; }
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="jarvis-logo">J.A.R.V.I.S</div>
+        
+        <button class="voice-button" id="voiceBtn">
+            <svg class="mic-icon" viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+            <div class="wave-animation">
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+            </div>
+        </button>
+
+        <div class="status-text" id="statusText">Tap to speak</div>
+
+        <div class="transcript" id="transcript">
+            <div class="ai-response">Hello! I'm Jarvis, your AI assistant. Tap the button and start speaking to get started.</div>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn" id="clearBtn">Clear</button>
+            <button class="control-btn" id="muteBtn">Mute Audio</button>
+        </div>
+
+        <div class="error-message" id="errorMsg"></div>
+    </div>
+
+    <script>
+        class JarvisVoiceAssistant {
+            constructor() {
+                this.recognition = null;
+                this.synthesis = window.speechSynthesis;
+                this.isListening = false;
+                this.isProcessing = false;
+                this.isMuted = false;
+                
+                this.voiceBtn = document.getElementById('voiceBtn');
+                this.statusText = document.getElementById('statusText');
+                this.transcript = document.getElementById('transcript');
+                this.errorMsg = document.getElementById('errorMsg');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.muteBtn = document.getElementById('muteBtn');
+                this.waveAnimation = document.querySelector('.wave-animation');
+
+                this.initSpeechRecognition();
+                this.bindEvents();
+            }
+
+            initSpeechRecognition() {
+                if ('webkitSpeechRecognition' in window) {
+                    this.recognition = new webkitSpeechRecognition();
+                } else if ('SpeechRecognition' in window) {
+                    this.recognition = new SpeechRecognition();
+                } else {
+                    this.showError('Speech recognition not supported in this browser');
+                    return;
+                }
+
+                this.recognition.continuous = false;
+                this.recognition.interimResults = true;
+                this.recognition.lang = 'en-US';
+
+                this.recognition.onstart = () => {
+                    this.isListening = true;
+                    this.updateUI('listening', 'Listening...');
+                    this.waveAnimation.classList.add('active');
+                };
+
+                this.recognition.onresult = (event) => {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    
+                    if (event.results[event.results.length - 1].isFinal) {
+                        this.processUserInput(transcript);
+                    }
+                };
+
+                this.recognition.onerror = (event) => {
+                    this.showError(`Speech recognition error: ${event.error}`);
+                    this.resetUI();
+                };
+
+                this.recognition.onend = () => {
+                    this.isListening = false;
+                    this.waveAnimation.classList.remove('active');
+                    if (!this.isProcessing) {
+                        this.resetUI();
+                    }
+                };
+            }
+
+            bindEvents() {
+                this.voiceBtn.addEventListener('click', () => {
+                    if (this.isListening) {
+                        this.stopListening();
+                    } else {
+                        this.startListening();
+                    }
+                });
+
+                this.clearBtn.addEventListener('click', () => {
+                    this.clearTranscript();
+                });
+
+                this.muteBtn.addEventListener('click', () => {
+                    this.toggleMute();
+                });
+            }
+
+            startListening() {
+                if (!this.recognition) return;
+                
+                this.clearError();
+                try {
+                    this.recognition.start();
+                } catch (error) {
+                    this.showError('Failed to start speech recognition');
+                }
+            }
+
+            stopListening() {
+                if (this.recognition && this.isListening) {
+                    this.recognition.stop();
+                }
+            }
+
+            async processUserInput(userText) {
+                this.isProcessing = true;
+                this.updateUI('processing', 'Processing...');
+                
+                // Add user message to transcript
+                const userDiv = document.createElement('div');
+                userDiv.className = 'user-message';
+                userDiv.textContent = `You: ${userText}`;
+                this.transcript.appendChild(userDiv);
+
+                // Generate AI response
+                const aiResponse = this.generateAIResponse(userText);
+                
+                // Add AI response to transcript
+                const aiDiv = document.createElement('div');
+                aiDiv.className = 'ai-response';
+                aiDiv.textContent = `Jarvis: ${aiResponse}`;
+                this.transcript.appendChild(aiDiv);
+
+                // Scroll to bottom
+                this.transcript.scrollTop = this.transcript.scrollHeight;
+
+                // Speak the response
+                if (!this.isMuted) {
+                    this.speakText(aiResponse);
+                }
+
+                this.isProcessing = false;
+                this.resetUI();
+            }
+
+            generateAIResponse(userText) {
+                const text = userText.toLowerCase();
+                
+                // Math calculations
+                if (text.includes('calculate') || text.includes('math') || text.match(/\d+\s*[\+\-\*\/]\s*\d+/)) {
+                    return this.handleMathQuery(text);
+                }
+                
+                // Time-based responses
+                if (text.includes('time') || text.includes('what time')) {
+                    return `The current time is ${new Date().toLocaleTimeString()}`;
+                }
+                
+                if (text.includes('date') || text.includes('what date') || text.includes('today')) {
+                    return `Today is ${new Date().toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    })}`;
+                }
+
+                // Weather (simulated with variety)
+                if (text.includes('weather')) {
+                    const weatherResponses = [
+                        "I don't have access to real-time weather data, but you can check your weather app for current conditions.",
+                        "For accurate weather information, I'd recommend checking a weather service like Weather.com or your local weather app.",
+                        "I can't access live weather data, but you can ask your device's built-in weather service or check online."
+                    ];
+                    return weatherResponses[Math.floor(Math.random() * weatherResponses.length)];
+                }
+
+                // Programming questions
+                if (text.includes('programming') || text.includes('code') || text.includes('javascript') || text.includes('python')) {
+                    return this.handleProgrammingQuery(text);
+                }
+
+                // Science questions
+                if (text.includes('science') || text.includes('physics') || text.includes('chemistry') || text.includes('biology')) {
+                    return this.handleScienceQuery(text);
+                }
+
+                // General knowledge
+                if (text.includes('what is') || text.includes('define') || text.includes('explain')) {
+                    return this.handleDefinitionQuery(text);
+                }
+
+                // Greetings with personality
+                if (text.includes('hello') || text.includes('hi') || text.includes('hey') || text.includes('good morning') || text.includes('good evening')) {
+                    const greetings = [
+                        "Hello! I'm Jarvis, your AI assistant. How may I help you today?",
+                        "Hi there! Ready to assist you with any questions or tasks.",
+                        "Good to see you! What can I help you explore today?",
+                        "Hello! I'm here and ready to help. What's on your mind?"
+                    ];
+                    return greetings[Math.floor(Math.random() * greetings.length)];
+                }
+
+                // Name and identity questions
+                if (text.includes('your name') || text.includes('who are you') || text.includes('what are you')) {
+                    return "I'm Jarvis, an AI voice assistant designed to help you with questions, calculations, explanations, and general conversation. Think of me as your digital assistant!";
+                }
+
+                // How are you with personality
+                if (text.includes('how are you') || text.includes('how do you feel')) {
+                    const statusResponses = [
+                        "I'm functioning perfectly and excited to help you today!",
+                        "Running smoothly and ready for any challenge you throw at me!",
+                        "All systems optimal! How can I assist you?",
+                        "I'm doing great and eager to help solve problems with you!"
+                    ];
+                    return statusResponses[Math.floor(Math.random() * statusResponses.length)];
+                }
+
+                // Jokes with more variety
+                if (text.includes('joke') || text.includes('funny') || text.includes('humor')) {
+                    const jokes = [
+                        "Why don't scientists trust atoms? Because they make up everything!",
+                        "I told my computer a joke about UDP, but it didn't get it.",
+                        "Why do programmers prefer dark mode? Because light attracts bugs!",
+                        "How do you organize a space party? You planet!",
+                        "Why did the AI go to therapy? It had too many deep learning issues!",
+                        "What do you call a fake noodle? An impasta!",
+                        "Why don't robots ever panic? They have nerves of steel!"
+                    ];
+                    return jokes[Math.floor(Math.random() * jokes.length)];
+                }
+
+                // Help with comprehensive features
+                if (text.includes('help') || text.includes('what can you do') || text.includes('capabilities')) {
+                    return "I can help you with: time and date queries, math calculations, general knowledge questions, programming concepts, science explanations, jokes, and thoughtful conversation. I can also provide definitions and explanations on various topics. Just speak naturally!";
+                }
+
+                // Thank you responses
+                if (text.includes('thank you') || text.includes('thanks')) {
+                    const thankResponses = [
+                        "You're very welcome! Happy to help anytime.",
+                        "My pleasure! Is there anything else I can assist you with?",
+                        "Glad I could help! Feel free to ask me anything else.",
+                        "You're welcome! I'm here whenever you need assistance."
+                    ];
+                    return thankResponses[Math.floor(Math.random() * thankResponses.length)];
+                }
+
+                // Goodbye responses
+                if (text.includes('goodbye') || text.includes('bye') || text.includes('see you')) {
+                    const goodbyes = [
+                        "Goodbye! Feel free to come back anytime you need assistance.",
+                        "See you later! I'll be here whenever you need me.",
+                        "Take care! Don't hesitate to return if you have more questions.",
+                        "Farewell! It was great helping you today."
+                    ];
+                    return goodbyes[Math.floor(Math.random() * goodbyes.length)];
+                }
+
+                // Intelligent contextual responses
+                return this.generateContextualResponse(userText);
+            }
+
+            handleMathQuery(text) {
+                try {
+                    // Simple math extraction and calculation
+                    const mathMatch = text.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/])\s*(\d+(?:\.\d+)?)/);
+                    if (mathMatch) {
+                        const [, num1, operator, num2] = mathMatch;
+                        const a = parseFloat(num1);
+                        const b = parseFloat(num2);
+                        let result;
+                        
+                        switch (operator) {
+                            case '+': result = a + b; break;
+                            case '-': result = a - b; break;
+                            case '*': result = a * b; break;
+                            case '/': result = b !== 0 ? a / b : 'undefined (division by zero)'; break;
+                        }
+                        
+                        return `${a} ${operator} ${b} equals ${result}`;
+                    }
+                } catch (error) {
+                    return "I can help with basic math operations like addition, subtraction, multiplication, and division. Try asking something like 'calculate 15 plus 27'";
+                }
+                
+                return "I can help with basic calculations. Try asking me to calculate something like '25 times 4' or '100 divided by 5'";
+            }
+
+            handleProgrammingQuery(text) {
+                if (text.includes('javascript') || text.includes('js')) {
+                    return "JavaScript is a versatile programming language used for web development, both frontend and backend. It's dynamic, interpreted, and supports object-oriented and functional programming paradigms.";
+                }
+                if (text.includes('python')) {
+                    return "Python is a high-level, interpreted programming language known for its simple syntax and readability. It's popular for data science, web development, automation, and AI applications.";
+                }
+                if (text.includes('html')) {
+                    return "HTML (HyperText Markup Language) is the standard markup language for creating web pages. It describes the structure and content of web documents using elements and tags.";
+                }
+                return "Programming involves writing instructions for computers to execute. Popular languages include Python, JavaScript, Java, C++, and many others, each with their own strengths and use cases.";
+            }
+
+            handleScienceQuery(text) {
+                if (text.includes('physics')) {
+                    return "Physics is the fundamental science that studies matter, energy, and their interactions. It covers everything from subatomic particles to the cosmos, including mechanics, thermodynamics, electromagnetism, and quantum physics.";
+                }
+                if (text.includes('chemistry')) {
+                    return "Chemistry is the science of matter and the changes it undergoes. It studies atoms, molecules, compounds, and chemical reactions that form the basis of all materials around us.";
+                }
+                if (text.includes('biology')) {
+                    return "Biology is the study of living organisms and life processes. It encompasses everything from molecular biology and genetics to ecology and evolution.";
+                }
+                return "Science helps us understand the natural world through observation, experimentation, and analysis. The main branches include physics, chemistry, biology, and earth sciences.";
+            }
+
+            handleDefinitionQuery(text) {
+                // Extract the term being asked about
+                let term = text.replace(/what is|define|explain/g, '').trim();
+                
+                // Common definitions
+                const definitions = {
+                    'ai': 'Artificial Intelligence (AI) refers to computer systems that can perform tasks typically requiring human intelligence, such as learning, reasoning, and problem-solving.',
+                    'machine learning': 'Machine Learning is a subset of AI that enables computers to learn and improve from experience without being explicitly programmed.',
+                    'blockchain': 'Blockchain is a distributed ledger technology that maintains a continuously growing list of records, linked and secured using cryptography.',
+                    'cloud computing': 'Cloud computing is the delivery of computing services over the internet, including storage, processing power, and software applications.',
+                    'internet': 'The Internet is a global network of interconnected computers that communicate using standardized protocols to share information and resources.'
+                };
+                
+                for (const [key, definition] of Object.entries(definitions)) {
+                    if (term.includes(key)) {
+                        return definition;
+                    }
+                }
+                
+                return `I'd be happy to explain concepts! Try asking me to define or explain specific terms like AI, machine learning, programming concepts, or scientific topics.`;
+            }
+
+            generateContextualResponse(userText) {
+                const responses = [
+                    "That's a fascinating topic! Could you tell me more about what specifically interests you?",
+                    "I find that quite intriguing. What aspect would you like to explore further?",
+                    "Interesting question! Let me think about that from different angles.",
+                    "That's worth discussing! What prompted your interest in this topic?",
+                    "Good point! I'd love to help you dive deeper into that subject.",
+                    "That's thought-provoking! Is there a particular angle you'd like me to focus on?",
+                    "I appreciate you bringing that up! How can I best assist you with this topic?",
+                    "That's an excellent question! Let me provide some insights on that.",
+                    "I'm glad you asked about that! It's definitely worth exploring.",
+                    "That's a great area to discuss! What would be most helpful for you to know?"
+                ];
+                
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
+
+            speakText(text) {
+                if (this.synthesis && !this.isMuted) {
+                    // Cancel any ongoing speech
+                    this.synthesis.cancel();
+                    
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    utterance.volume = 0.8;
+                    
+                    // Try to use a more natural voice
+                    const voices = this.synthesis.getVoices();
+                    const preferredVoice = voices.find(voice => 
+                        voice.name.includes('Google') || 
+                        voice.name.includes('Microsoft') ||
+                        voice.lang === 'en-US'
+                    );
+                    if (preferredVoice) {
+                        utterance.voice = preferredVoice;
+                    }
+                    
+                    this.synthesis.speak(utterance);
+                }
+            }
+
+            updateUI(state, message) {
+                this.statusText.textContent = message;
+                this.statusText.classList.add('active');
+                
+                this.voiceBtn.className = `voice-button ${state}`;
+            }
+
+            resetUI() {
+                this.statusText.textContent = 'Tap to speak';
+                this.statusText.classList.remove('active');
+                this.voiceBtn.className = 'voice-button';
+            }
+
+            clearTranscript() {
+                this.transcript.innerHTML = '<div class="ai-response">Transcript cleared. How can I help you?</div>';
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                this.muteBtn.textContent = this.isMuted ? 'Unmute Audio' : 'Mute Audio';
+                
+                if (this.isMuted) {
+                    this.synthesis.cancel();
+                }
+            }
+
+            showError(message) {
+                this.errorMsg.textContent = message;
+                setTimeout(() => this.clearError(), 5000);
+            }
+
+            clearError() {
+                this.errorMsg.textContent = '';
+            }
+        }
+
+        // Initialize the voice assistant when the page loads
+        window.addEventListener('load', () => {
+            new JarvisVoiceAssistant();
+        });
+
+        // Handle speech synthesis voices loading
+        window.speechSynthesis.onvoiceschanged = () => {
+            // Voices are now loaded
+        };
+    </script>
+</body>
+</html>
